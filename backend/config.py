@@ -1,16 +1,16 @@
+from __future__ import annotations
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     database_url: str
-    upstash_redis_url: str
-    upstash_redis_token: str
+    redis_url: str = "redis://localhost:6379"
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     encryption_key: str
     telegram_bot_token: str = ""
     # Master secret for admin endpoints (project/key management)
     admin_secret: str = "change-me"
-    # From Supabase dashboard → Project Settings → API → JWT Secret
+    # Supabase JWT secret — leave empty to disable auth (local dev only)
     supabase_jwt_secret: str = ""
 
     class Config:

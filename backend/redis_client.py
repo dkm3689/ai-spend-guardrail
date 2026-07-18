@@ -1,15 +1,15 @@
 from __future__ import annotations
 from datetime import date
-from upstash_redis.asyncio import Redis
+import redis.asyncio as aioredis
 from config import settings
 
-_redis: Redis | None = None
+_redis: aioredis.Redis | None = None
 
 
-def get_redis() -> Redis:
+def get_redis() -> aioredis.Redis:
     global _redis
     if _redis is None:
-        _redis = Redis(url=settings.upstash_redis_url, token=settings.upstash_redis_token)
+        _redis = aioredis.from_url(settings.redis_url, decode_responses=True)
     return _redis
 
 

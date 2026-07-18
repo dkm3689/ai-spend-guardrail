@@ -1,3 +1,4 @@
+from __future__ import annotations
 from cryptography.fernet import Fernet
 from config import settings
 
