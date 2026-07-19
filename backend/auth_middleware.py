@@ -5,7 +5,7 @@ from fastapi import Depends, Header, HTTPException
 
 from config import settings
 
-_DEV_USER_ID = "dev-user-00000000-0000-0000-0000-000000000000"
+_DEV_USER_ID = "00000000-0000-0000-0000-000000000000"
 
 
 async def get_current_user_id(authorization: str = Header(default="")) -> str:
