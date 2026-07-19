@@ -2,7 +2,12 @@ import { supabase } from './supabase'
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+const IS_LOCAL_DEV = process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith('http://localhost')
+
 async function headers() {
+  if (IS_LOCAL_DEV) {
+    return { 'Content-Type': 'application/json', Authorization: 'Bearer dev' }
+  }
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not authenticated')
   return {

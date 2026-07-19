@@ -12,6 +12,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    // Skip Supabase auth when running locally without a real Supabase project
+    const isLocalDev = process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith('http://localhost')
+    if (isLocalDev) {
+      setEmail('local-dev')
+      setReady(true)
+      return
+    }
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         router.replace('/auth')
