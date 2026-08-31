@@ -17,8 +17,10 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS api_keys (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id              UUID NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
-    key_hash                TEXT NOT NULL UNIQUE,   -- SHA-256 of the proxy key
-    provider_key_encrypted  TEXT NOT NULL,           -- Fernet-encrypted Anthropic key
+    key_hash                TEXT NOT NULL UNIQUE,
+    key_mode                TEXT NOT NULL DEFAULT 'stored'
+                                CHECK (key_mode IN ('stored', 'agent')),
+    provider_key_encrypted  TEXT,        -- Fernet-encrypted Anthropic key; NULL for agent mode
     created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -40,6 +42,11 @@ CREATE TABLE IF NOT EXISTS alerts_sent (
     threshold_pct INTEGER NOT NULL,
     sent_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migration for existing deployments (run once if upgrading from v0.1):
+-- ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_mode TEXT NOT NULL DEFAULT 'stored'
+--     CHECK (key_mode IN ('stored', 'agent'));
+-- ALTER TABLE api_keys ALTER COLUMN provider_key_encrypted DROP NOT NULL;
 
 -- indexes for common dashboard queries
 CREATE INDEX IF NOT EXISTS idx_requests_project_created ON requests (project_id, created_at DESC);

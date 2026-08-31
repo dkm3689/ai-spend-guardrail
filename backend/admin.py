@@ -36,7 +36,8 @@ class CreateProjectRequest(BaseModel):
 
 
 class CreateKeyRequest(BaseModel):
-    provider_key: str  # the user's real Anthropic API key
+    key_mode: str = "stored"   # "stored" | "agent"
+    provider_key: str = ""     # required for stored mode; leave empty for agent mode
 
 
 # ── routes ────────────────────────────────────────────────────────────────────
@@ -73,19 +74,34 @@ async def list_projects():
 
 @router.post("/projects/{project_id}/keys", dependencies=[Depends(_require_admin)])
 async def create_api_key(project_id: str, body: CreateKeyRequest):
+    valid_modes = {"stored", "agent"}
+    if body.key_mode not in valid_modes:
+        raise HTTPException(status_code=400, detail=f"key_mode must be one of {valid_modes}")
+    if body.key_mode == "stored" and not body.provider_key:
+        raise HTTPException(status_code=400, detail="provider_key is required for stored mode")
+
     plain_key = f"sk-guard-{secrets.token_hex(24)}"
     key_hash = hashlib.sha256(plain_key.encode()).hexdigest()
-    encrypted = encrypt_key(body.provider_key)
+    encrypted = encrypt_key(body.provider_key) if body.provider_key else None
 
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO api_keys (project_id, key_hash, provider_key_encrypted) VALUES ($1, $2, $3)",
-            project_id, key_hash, encrypted,
+            "INSERT INTO api_keys (project_id, key_hash, key_mode, provider_key_encrypted) VALUES ($1,$2,$3,$4)",
+            project_id, key_hash, body.key_mode, encrypted,
         )
 
-    # Return the plain key once — it is NOT stored in plaintext, save it now
-    return {"proxy_key": plain_key, "warning": "Save this key — it will not be shown again."}
+    result = {
+        "proxy_key": plain_key,
+        "key_mode": body.key_mode,
+        "warning": "Save this key — it will not be shown again.",
+    }
+    if body.key_mode == "agent":
+        result["next_step"] = (
+            "Configure the Guardrail Agent with this key. "
+            "See agent/.env.example for setup instructions."
+        )
+    return result
 
 
 @router.get("/projects/{project_id}/spend", dependencies=[Depends(_require_admin)])

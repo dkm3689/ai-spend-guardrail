@@ -31,7 +31,8 @@ class ProjectBody(BaseModel):
 
 
 class KeyBody(BaseModel):
-    provider_key: str
+    key_mode: str = "stored"   # "stored" | "agent"
+    provider_key: str = ""     # required for stored mode; leave empty for agent mode
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -146,22 +147,37 @@ async def create_key(
     project_id: str, body: KeyBody,
     user_id: str = Depends(get_current_user_id),
 ):
+    valid_modes = {"stored", "agent"}
+    if body.key_mode not in valid_modes:
+        raise HTTPException(status_code=400, detail=f"key_mode must be one of {valid_modes}")
+    if body.key_mode == "stored" and not body.provider_key:
+        raise HTTPException(status_code=400, detail="provider_key is required for stored mode")
+
     pool = await get_pool()
     async with pool.acquire() as conn:
         await _assert_owns(conn, project_id, user_id)
 
     plain_key = f"sk-guard-{secrets.token_hex(24)}"
     key_hash = hashlib.sha256(plain_key.encode()).hexdigest()
-    encrypted = encrypt_key(body.provider_key)
+    encrypted = encrypt_key(body.provider_key) if body.provider_key else None
 
-    pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO api_keys (project_id, key_hash, provider_key_encrypted) VALUES ($1,$2,$3)",
-            project_id, key_hash, encrypted,
+            "INSERT INTO api_keys (project_id, key_hash, key_mode, provider_key_encrypted) VALUES ($1,$2,$3,$4)",
+            project_id, key_hash, body.key_mode, encrypted,
         )
 
-    return {"proxy_key": plain_key, "warning": "Save this key — it will not be shown again."}
+    result = {
+        "proxy_key": plain_key,
+        "key_mode": body.key_mode,
+        "warning": "Save this key — it will not be shown again.",
+    }
+    if body.key_mode == "agent":
+        result["next_step"] = (
+            "Configure the Guardrail Agent with this key. "
+            "See agent/.env.example for setup instructions."
+        )
+    return result
 
 
 @router.get("/projects/{project_id}/requests")

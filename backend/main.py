@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from admin import router as admin_router
+from agent_routes import router as agent_router
 from user_routes import router as user_router
 from crypto import decrypt_key
 from database import close_pool, get_pool
@@ -36,6 +37,7 @@ app.add_middleware(
 )
 
 app.include_router(admin_router)
+app.include_router(agent_router)
 app.include_router(user_router)
 
 
@@ -50,7 +52,7 @@ async def _get_project_and_key(proxy_key: str) -> tuple[Project, str]:
             """
             SELECT p.id, p.name, p.budget_daily, p.budget_monthly,
                    p.enforcement_mode, p.telegram_chat_id,
-                   k.provider_key_encrypted
+                   k.key_mode, k.provider_key_encrypted
             FROM api_keys k
             JOIN projects p ON k.project_id = p.id
             WHERE k.key_hash = $1
@@ -60,6 +62,14 @@ async def _get_project_and_key(proxy_key: str) -> tuple[Project, str]:
 
     if not row:
         raise HTTPException(status_code=401, detail="Invalid proxy API key")
+    if row["key_mode"] == "agent":
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "This key is configured for agent mode. "
+                "Run the Guardrail Agent on your infrastructure and point your app at it."
+            ),
+        )
 
     project = Project(
         id=str(row["id"]),
@@ -81,10 +91,22 @@ async def proxy_messages(request: Request):
     if not proxy_key:
         raise HTTPException(status_code=401, detail="Missing x-api-key header")
 
-    project, provider_key = await _get_project_and_key(proxy_key)
+    project, stored_key = await _get_project_and_key(proxy_key)
+
+    # Pass-through mode: caller supplies their own key per-request; it is never stored.
+    # Takes priority over any stored key so users can self-manage key rotation.
+    provider_key = request.headers.get("x-provider-key") or stored_key
+    if not provider_key:
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "No provider key available. Either store a key via POST /keys, "
+                "or pass your Anthropic key in the x-provider-key request header."
+            ),
+        )
+
     body = await request.json()
     pool = await get_pool()
-
     return await handle_proxy_request(body, dict(request.headers), project, provider_key, pool)
 
 

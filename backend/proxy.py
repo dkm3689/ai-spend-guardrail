@@ -20,7 +20,8 @@ from redis_client import get_spend, increment_spend
 
 logger = logging.getLogger(__name__)
 
-ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+from config import settings as _settings
+ANTHROPIC_API_URL = _settings.anthropic_api_url
 ANTHROPIC_VERSION = "2023-06-01"
 
 
