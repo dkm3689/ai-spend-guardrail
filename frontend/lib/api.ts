@@ -94,10 +94,10 @@ export const api = {
       req<SpendPoint[]>(`/api/projects/${projectId}/spend/history?days=${days}`),
   },
   keys: {
-    create: (projectId: string, providerKey: string) =>
-      req<{ proxy_key: string; warning: string }>(`/api/projects/${projectId}/keys`, {
+    create: (projectId: string, opts: { key_mode: 'stored' | 'agent'; provider_key?: string }) =>
+      req<{ proxy_key: string; key_mode: string; warning?: string }>(`/api/projects/${projectId}/keys`, {
         method: 'POST',
-        body: JSON.stringify({ provider_key: providerKey }),
+        body: JSON.stringify(opts),
       }),
   },
   requests: {

@@ -27,8 +27,10 @@ export default function ProjectDetailPage() {
 
   // API key generation
   const [showKeyModal, setShowKeyModal] = useState(false)
+  const [keyMode, setKeyMode] = useState<'stored' | 'agent'>('agent')
   const [providerKey, setProviderKey] = useState('')
   const [generatedKey, setGeneratedKey] = useState('')
+  const [generatedKeyMode, setGeneratedKeyMode] = useState<'stored' | 'agent'>('agent')
   const [generatingKey, setGeneratingKey] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -69,8 +71,12 @@ export default function ProjectDetailPage() {
   async function generateKey(e: React.FormEvent) {
     e.preventDefault()
     setGeneratingKey(true)
-    const result = await api.keys.create(projectId, providerKey)
+    const result = await api.keys.create(projectId, {
+      key_mode: keyMode,
+      ...(keyMode === 'stored' ? { provider_key: providerKey } : {}),
+    })
     setGeneratedKey(result.proxy_key)
+    setGeneratedKeyMode(result.key_mode as 'stored' | 'agent')
     setProviderKey('')
     setGeneratingKey(false)
   }
@@ -210,19 +216,39 @@ export default function ProjectDetailPage() {
       )}
 
       {/* How to use */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mt-6">
         <h2 className="text-sm font-medium text-zinc-100 mb-3">How to use</h2>
-        <p className="text-xs text-zinc-500 mb-3">
-          Point your app at the proxy with a one-line change. Generate a key above first.
-        </p>
-        <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-xs text-zinc-300 overflow-x-auto">
-{`import anthropic
 
+        {/* Agent mode instructions */}
+        <div className="mb-4">
+          <p className="text-xs font-medium text-zinc-400 mb-1">Agent mode (recommended)</p>
+          <p className="text-xs text-zinc-500 mb-2">
+            Run the agent on your server, then point your app at it:
+          </p>
+          <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-xs text-zinc-300 overflow-x-auto">{`# 1. Start the agent on your server
+ANTHROPIC_API_KEY=sk-ant-...
+GUARDRAIL_PROJECT_KEY=sk-guard-...
+GUARDRAIL_URL=https://your-proxy.railway.app
+python agent/agent.py
+
+# 2. Point your app at the local agent
 client = anthropic.Anthropic(
-    api_key="sk-guard-...",   # your proxy key
+    api_key="sk-guard-...",   # proxy key from dashboard
+    base_url="http://localhost:8002",
+)`}</pre>
+        </div>
+
+        {/* Stored mode instructions */}
+        <div>
+          <p className="text-xs font-medium text-zinc-400 mb-1">Stored mode</p>
+          <p className="text-xs text-zinc-500 mb-2">
+            No agent needed — point directly at the proxy:
+          </p>
+          <pre className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-xs text-zinc-300 overflow-x-auto">{`client = anthropic.Anthropic(
+    api_key="sk-guard-...",   # proxy key from dashboard
     base_url="https://your-proxy.railway.app",
-)`}
-        </pre>
+)`}</pre>
+        </div>
       </div>
 
       {/* Generate key modal */}
@@ -230,13 +256,15 @@ client = anthropic.Anthropic(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md">
             <h2 className="text-base font-medium text-zinc-100 mb-1">Generate proxy key</h2>
-            <p className="text-xs text-zinc-500 mb-4">
-              Your Anthropic API key is encrypted at rest and never logged.
-            </p>
 
             {generatedKey ? (
               <div>
-                <label>Your proxy key — save this now, it won't be shown again</label>
+                <p className="text-xs text-zinc-500 mb-4">
+                  {generatedKeyMode === 'agent'
+                    ? 'Run the Guardrail Agent on your server and paste this key into its .env file.'
+                    : 'Your Anthropic key is encrypted at rest. Save this proxy key — it won\'t be shown again.'}
+                </p>
+                <label>Proxy key — save this now</label>
                 <div className="flex gap-2 mt-1">
                   <input readOnly value={generatedKey} className="font-mono text-xs" />
                   <button onClick={copyKey}
@@ -244,6 +272,11 @@ client = anthropic.Anthropic(
                     {copied ? '✓' : 'Copy'}
                   </button>
                 </div>
+                {generatedKeyMode === 'agent' && (
+                  <div className="mt-3 bg-zinc-800 rounded-lg p-3 text-xs text-zinc-400 font-mono">
+                    GUARDRAIL_PROJECT_KEY={generatedKey}
+                  </div>
+                )}
                 <button onClick={() => { setShowKeyModal(false); setGeneratedKey('') }}
                   className="mt-4 w-full text-sm text-zinc-400 hover:text-zinc-200 py-2 transition-colors">
                   Done
@@ -251,9 +284,40 @@ client = anthropic.Anthropic(
               </div>
             ) : (
               <form onSubmit={generateKey}>
-                <label>Your Anthropic API key</label>
-                <input type="password" placeholder="sk-ant-..." value={providerKey}
-                  onChange={(e) => setProviderKey(e.target.value)} required />
+                {/* Mode selector */}
+                <div className="flex bg-zinc-800 rounded-lg p-1 mb-4 mt-3">
+                  {(['agent', 'stored'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setKeyMode(m)}
+                      className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        keyMode === m
+                          ? 'bg-zinc-700 text-zinc-100'
+                          : 'text-zinc-500 hover:text-zinc-300'
+                      }`}
+                    >
+                      {m === 'agent' ? '🔒 Agent mode (recommended)' : '🗝️ Stored mode'}
+                    </button>
+                  ))}
+                </div>
+
+                {keyMode === 'agent' ? (
+                  <p className="text-xs text-zinc-500 mb-4">
+                    Your Anthropic key stays on your own server. The Guardrail Agent runs locally,
+                    checks budget with us, and calls Anthropic directly — your key never leaves your infrastructure.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-xs text-zinc-500 mb-3">
+                      Your Anthropic key is encrypted (AES-256) before storage and never logged.
+                    </p>
+                    <label>Your Anthropic API key</label>
+                    <input type="password" placeholder="sk-ant-..." value={providerKey}
+                      onChange={(e) => setProviderKey(e.target.value)} required={keyMode === 'stored'} />
+                  </>
+                )}
+
                 <div className="flex gap-3 mt-4">
                   <button type="submit" disabled={generatingKey}
                     className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors">
