@@ -21,8 +21,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await get_pool()
-    logger.info("Database pool ready")
+    try:
+        await get_pool()
+        logger.info("Database pool ready")
+    except Exception as e:
+        logger.warning(f"DB pool failed at startup (will retry on first request): {e}")
     yield
     await close_pool()
 
