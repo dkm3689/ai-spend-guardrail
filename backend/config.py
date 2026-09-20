@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     admin_secret: str = "change-me"
     # Supabase JWT secret — leave empty to disable auth (local dev only)
     supabase_jwt_secret: str = ""
+    # Supabase project URL — enables JWKS verification (supports ES256/RS256)
+    supabase_url: str = ""
 
     class Config:
         env_file = ".env"
