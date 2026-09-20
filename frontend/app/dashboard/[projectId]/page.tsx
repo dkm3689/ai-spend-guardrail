@@ -19,6 +19,7 @@ export default function ProjectDetailPage() {
   const [history, setHistory] = useState<SpendPoint[]>([])
   const [days, setDays] = useState<7 | 14 | 30>(7)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Edit form state
   const [editing, setEditing] = useState(false)
@@ -35,6 +36,8 @@ export default function ProjectDetailPage() {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
+    setLoading(true)
+    setError(null)
     Promise.all([
       api.projects.get(projectId),
       api.spend.history(projectId, days),
@@ -48,6 +51,9 @@ export default function ProjectDetailPage() {
         enforcement_mode: proj.enforcement_mode,
         telegram_chat_id: proj.telegram_chat_id ?? '',
       })
+      setLoading(false)
+    }).catch((err) => {
+      setError(err.message ?? 'Failed to load project')
       setLoading(false)
     })
   }, [projectId, days])
@@ -91,6 +97,20 @@ export default function ProjectDetailPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors mb-6 inline-block">
+          ← Projects
+        </Link>
+        <div className="bg-red-950 border border-red-800 rounded-2xl p-6 mt-4">
+          <p className="text-red-400 font-medium mb-1">Failed to load project</p>
+          <p className="text-red-300 text-sm font-mono">{error}</p>
+        </div>
       </div>
     )
   }
