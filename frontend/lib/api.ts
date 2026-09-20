@@ -9,7 +9,10 @@ async function headers() {
     return { 'Content-Type': 'application/json', Authorization: 'Bearer dev' }
   }
   const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Not authenticated')
+  if (!session) {
+    if (typeof window !== 'undefined') window.location.href = '/auth'
+    throw new Error('Not authenticated')
+  }
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${session.access_token}`,
