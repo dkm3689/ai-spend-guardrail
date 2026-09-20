@@ -13,6 +13,7 @@ async def get_pool() -> asyncpg.Pool:
             min_size=2,
             max_size=10,
             ssl="require",
+            statement_cache_size=0,  # required for PgBouncer/Supabase pooler in transaction mode
         )
     return _pool
 
