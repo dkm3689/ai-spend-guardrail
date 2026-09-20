@@ -1,7 +1,10 @@
 from __future__ import annotations
+import logging
 from datetime import date
 import redis.asyncio as aioredis
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 _redis: aioredis.Redis | None = None
 
@@ -23,9 +26,13 @@ def _monthly_key(project_id: str) -> str:
 
 
 async def get_spend(project_id: str) -> tuple[float, float]:
-    redis = get_redis()
-    daily, monthly = await redis.mget(_daily_key(project_id), _monthly_key(project_id))
-    return float(daily or 0), float(monthly or 0)
+    try:
+        redis = get_redis()
+        daily, monthly = await redis.mget(_daily_key(project_id), _monthly_key(project_id))
+        return float(daily or 0), float(monthly or 0)
+    except Exception as e:
+        logger.warning("Redis get_spend failed (returning 0): %s", e)
+        return 0.0, 0.0
 
 
 async def increment_spend(project_id: str, cost: float) -> tuple[float, float]:
