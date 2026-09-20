@@ -19,6 +19,10 @@ async function headers() {
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...init, headers: await headers() })
   if (!res.ok) {
+    if (res.status === 401 && typeof window !== 'undefined') {
+      await supabase.auth.signOut()
+      window.location.href = '/auth'
+    }
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail ?? 'Request failed')
   }

@@ -21,7 +21,7 @@ async def get_current_user_id(authorization: str = Header(default="")) -> str:
         payload = jwt.decode(
             token,
             settings.supabase_jwt_secret,
-            algorithms=["HS256"],
+            algorithms=["HS256", "RS256"],
             audience="authenticated",
         )
         return str(payload["sub"])
